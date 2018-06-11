@@ -1,0 +1,18 @@
+version: '1'
+
+services:
+  sqlite3:
+    image: nouchka/sqlite3
+    container_name: prod-haskell-series-sqlite3
+
+  postgres:
+    image: postgres:9.6
+    container_name: prod-haskell-series-postgres
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:4.0
+    container_name: prod-haskell-series-redis
+    ports:
+      - "6379:6379"

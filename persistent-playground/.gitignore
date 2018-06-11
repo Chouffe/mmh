@@ -1,0 +1,4 @@
+.stack-work/
+persistent-playground.cabal
+*~
+*.sqlite3
