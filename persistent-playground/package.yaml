@@ -23,7 +23,7 @@ dependencies:
 - aeson
 - base >= 4.7 && < 5
 - bytestring
-- conduit
+- esqueleto
 - hedis
 - monad-logger
 - mtl
@@ -36,6 +36,7 @@ dependencies:
 - servant-client
 - servant-server
 - text
+- time
 - transformers
 - warp
 

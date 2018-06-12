@@ -6,8 +6,6 @@ module SQLite where
 
 import           Control.Monad.IO.Class  (liftIO)
 import           Control.Monad.Logger    (LoggingT, runStdoutLoggingT)
-import           Data.Conduit            (($$))
-import           Data.Conduit.List       as CL
 import           Data.Text               (Text)
 import qualified Data.Text               as T
 import           Database.Persist        (Entity, SelectOpt (..), delete, get,

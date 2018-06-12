@@ -10,9 +10,10 @@ import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Trans.Except (throwE)
 import           Data.Int                   (Int64)
 import           Data.Proxy                 (Proxy (..))
+import           Database.Persist           (Entity (..))
 import           Network.Wai.Handler.Warp   (run)
 import           Servant.API
-import           Servant.Client             (ClientEnv (..), ClientM, client)
+import           Servant.Client             (ClientM, client)
 import           Servant.Server
 
 import           Database
@@ -27,10 +28,23 @@ data Config
 
 
 -- API type and Server
-type UsersAPI =
-       "users" :> Capture "userid" Int64 :> Get '[JSON] User
+
+-- Users API
+type UsersAPI
+  = "users" :> Capture "userid" Int64 :> Get '[JSON] User
   :<|> "users" :> ReqBody '[JSON] User :> Post '[JSON] Int64
-  :<|> "all" :> Get '[JSON] [User]
+  :<|> "users" :> "all" :> Get '[JSON] [User]
+
+-- Articles API
+type ArticlesAPI
+  = "articles" :> Capture "articleid" Int64 :> Get '[JSON] Article
+  :<|> "articles" :> ReqBody '[JSON] Article :> Post '[JSON] Int64
+  :<|> "articles" :> "author" :> Capture "authorid" Int64 :> Get '[JSON] [Entity Article]
+  :<|> "articles" :> "recent" :> Get '[JSON] [(Entity User, Entity Article)]
+
+type FullAPI
+  = UsersAPI
+  :<|> ArticlesAPI
 
 usersServer :: SQLiteInfo -> RedisInfo -> Server UsersAPI
 usersServer sqlInfo redInfo =
@@ -38,9 +52,23 @@ usersServer sqlInfo redInfo =
   :<|> createUserHandler sqlInfo
   :<|> allUsersHandler sqlInfo
 
+articlesServer :: SQLiteInfo -> Server ArticlesAPI
+articlesServer sqlInfo =
+       fetchArticleHandler sqlInfo
+  :<|> createArticleHandler sqlInfo
+  :<|> fetchArticleByAuthorHandler sqlInfo
+  :<|> fetchRecentArticlesHandler sqlInfo
+
+fullServer :: SQLiteInfo -> RedisInfo -> Server FullAPI
+fullServer sqlInfo redInfo =
+       usersServer sqlInfo redInfo
+  :<|> articlesServer sqlInfo
 
 usersAPI :: Proxy UsersAPI
 usersAPI = Proxy :: Proxy UsersAPI
+
+fullAPI :: Proxy FullAPI
+fullAPI = Proxy :: Proxy FullAPI
 
 getPort :: ServerMode -> Int
 getPort Prod = 8000
@@ -67,8 +95,8 @@ runServer serverMode = do
 
   putStrLn $ "Running server on port: " ++ (show (port config))
   run (port config)
-    $ serve usersAPI
-    $ usersServer (sqliteInfo config) (redisInfo config)
+    $ serve fullAPI
+    $ fullServer (sqliteInfo config) (redisInfo config)
 
 -- Handlers
 fetchUserHandler :: SQLiteInfo -> RedisInfo -> Int64 -> Handler User
@@ -93,7 +121,23 @@ createUserHandler connStr user = do
 allUsersHandler :: SQLiteInfo -> Handler [User]
 allUsersHandler connStr = liftIO $ getAllUsersSQLite connStr
 
--- Servant Client
+fetchArticleHandler :: SQLiteInfo -> Int64 -> Handler Article
+fetchArticleHandler connStr aid = do
+  maybeArticle <- liftIO $ fetchArticleSQLite connStr aid
+  case maybeArticle of
+    Just article -> return article
+    Nothing -> Handler $ (throwE $ err401 { errBody = "Could not find article with that ID" })
+
+createArticleHandler :: SQLiteInfo -> Article -> Handler Int64
+createArticleHandler connStr article = liftIO $ createArticleSQLite connStr article
+
+fetchArticleByAuthorHandler :: SQLiteInfo -> Int64 -> Handler [Entity Article]
+fetchArticleByAuthorHandler connStr uid = liftIO $ fetchArticleByAuthorSQLite connStr uid
+
+fetchRecentArticlesHandler :: SQLiteInfo -> Handler [(Entity User, Entity Article)]
+fetchRecentArticlesHandler connStr = liftIO $ fetchRecentArticlesSQLite connStr 10
+
+-- Servant Client: used in Tests to query programmatically the API
 
 fetchUserClient :: Int64 -> ClientM User
 createUserClient :: User -> ClientM Int64
