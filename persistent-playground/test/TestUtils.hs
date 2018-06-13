@@ -26,7 +26,7 @@ setupTests = do
   mgr        <- newManager tlsManagerSettings
   baseUrl    <- parseBaseUrl $ "http://127.0.0.1:" ++ show (port config)
 
-  let clientEnv = ClientEnv mgr baseUrl Nothing
+  let clientEnv = ClientEnv mgr baseUrl
   -- let connString = "host=127.0.0.1 port=5432 user=postgres dbname=postgres password=password"
 
   -- Silent DB Migration

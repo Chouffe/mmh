@@ -145,4 +145,14 @@ allUsersClient :: ClientM [User]
 
 fetchUserClient :<|>
   createUserClient :<|>
-    allUsersClient = client (Proxy :: Proxy UsersAPI)
+  allUsersClient = client (Proxy :: Proxy UsersAPI)
+
+fetchArticleClient :: Int64 -> ClientM Article
+createArticleClient :: Article -> ClientM Int64
+fetchArticleByAuthorClient :: Int64 -> ClientM [Entity Article]
+fetchRecentArticlesClient :: ClientM [(Entity User, Entity Article)]
+
+fetchArticleClient :<|>
+  createArticleClient :<|>
+  fetchArticleByAuthorClient :<|>
+  fetchRecentArticlesClient = client (Proxy :: Proxy ArticlesAPI)

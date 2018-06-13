@@ -131,6 +131,9 @@ createArticleSQLite connStr article =
   fromSqlKey
     <$> runSqliteAction connStr (insert article)
 
+deleteArticleSQLite :: SQLiteInfo -> Int64 -> IO ()
+deleteArticleSQLite connStr articleid = runSqliteAction connStr $ delete ((toSqlKey articleid) :: Key Article)
+
 fetchArticleSQLite :: SQLiteInfo -> Int64 -> IO (Maybe Article)
 fetchArticleSQLite connStr articleid = runSqliteAction connStr selectAction
   where
