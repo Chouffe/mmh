@@ -16,8 +16,10 @@ import           Servant.API
 import           Servant.Client             (ClientM, client)
 import           Servant.Server
 
+import           Cache
 import           Database
 import           Schema
+import           Types
 
 data Config
   = Config { port       :: Int
@@ -88,54 +90,56 @@ runServer serverMode = do
   config <- fetchConfig serverMode
   print config
 
-  -- Debug
-  putStrLn "Fetching all users in DB"
-  users <- runSqliteAction (sqliteInfo config) selectYoungUsers
-  print users
-
   putStrLn $ "Running server on port: " ++ (show (port config))
   run (port config)
     $ serve fullAPI
     $ fullServer (sqliteInfo config) (redisInfo config)
 
--- Handlers
+-- TODO: Handlers
 fetchUserHandler :: SQLiteInfo -> RedisInfo -> Int64 -> Handler User
-fetchUserHandler connStr redInfo userId = do
-  liftIO $ putStrLn "Fetching User"
-  mRedisUser <- liftIO $ fetchUserRedis redInfo userId
-  case mRedisUser of
-    Just user -> liftIO (putStrLn "Cache Hit!") >> return user
-    Nothing -> do
-      mDBuser <- liftIO $ fetchUserSQLite connStr userId
-      case mDBuser of
-        Nothing   -> Handler $ (throwE $ err401 { errBody = "Could not find user with ID"})
-        Just user -> do
-          liftIO $ cacheUser redInfo userId user
-          return user
+fetchUserHandler connStr redInfo userId = undefined
+-- fetchUserHandler connStr redInfo userId = do
+--   liftIO $ putStrLn "Fetching User"
+--   mRedisUser <- liftIO $ fetchUserRedis redInfo userId
+--   case mRedisUser of
+--     Just user -> liftIO (putStrLn "Cache Hit!") >> return user
+--     Nothing -> do
+--       mDBuser <- liftIO $ fetchUserSQLite connStr userId
+--       case mDBuser of
+--         Nothing   -> Handler $ (throwE $ err401 { errBody = "Could not find user with ID"})
+--         Just user -> do
+--           liftIO $ cacheUserRedis redInfo userId user
+--           return user
 
 createUserHandler :: SQLiteInfo -> User -> Handler Int64
-createUserHandler connStr user = do
-  liftIO $ putStrLn "Creating user"
-  liftIO $ createUserSQLite connStr user
+createUserHandler connStr user = undefined
+-- createUserHandler connStr user = do
+--   liftIO $ putStrLn "Creating user"
+--   liftIO $ createUserSQLite connStr user
 
 allUsersHandler :: SQLiteInfo -> Handler [User]
-allUsersHandler connStr = liftIO $ getAllUsersSQLite connStr
+allUsersHandler connStr = undefined
+-- allUsersHandler connStr = liftIO $ getAllUsersSQLite connStr
 
 fetchArticleHandler :: SQLiteInfo -> Int64 -> Handler Article
-fetchArticleHandler connStr aid = do
-  maybeArticle <- liftIO $ fetchArticleSQLite connStr aid
-  case maybeArticle of
-    Just article -> return article
-    Nothing -> Handler $ (throwE $ err401 { errBody = "Could not find article with that ID" })
+fetchArticleHandler connStr aid = undefined
+-- fetchArticleHandler connStr aid = do
+--   maybeArticle <- liftIO $ fetchArticleSQLite connStr aid
+--   case maybeArticle of
+--     Just article -> return article
+--     Nothing -> Handler $ (throwE $ err401 { errBody = "Could not find article with that ID" })
 
 createArticleHandler :: SQLiteInfo -> Article -> Handler Int64
-createArticleHandler connStr article = liftIO $ createArticleSQLite connStr article
+createArticleHandler connStr article = undefined
+-- createArticleHandler connStr article = liftIO $ createArticleSQLite connStr article
 
 fetchArticleByAuthorHandler :: SQLiteInfo -> Int64 -> Handler [Entity Article]
-fetchArticleByAuthorHandler connStr uid = liftIO $ fetchArticleByAuthorSQLite connStr uid
+fetchArticleByAuthorHandler connStr uid = undefined
+-- fetchArticleByAuthorHandler connStr uid = liftIO $ fetchArticleByAuthorSQLite connStr uid
 
 fetchRecentArticlesHandler :: SQLiteInfo -> Handler [(Entity User, Entity Article)]
-fetchRecentArticlesHandler connStr = liftIO $ fetchRecentArticlesSQLite connStr 10
+fetchRecentArticlesHandler connStr = undefined
+-- fetchRecentArticlesHandler connStr = liftIO $ fetchRecentArticlesSQLite connStr 10
 
 -- Servant Client: used in Tests to query programmatically the API
 

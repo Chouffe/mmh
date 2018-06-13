@@ -14,12 +14,14 @@ import           Servant.Client          (ClientEnv (..), parseBaseUrl)
 
 import           API                     (fetchConfig, port, redisInfo,
                                           runServer, sqliteInfo)
-import           Database                (RedisInfo, SQLiteInfo,
-                                          ServerMode (..), insertUser,
+import           Database                (SQLiteInfo, insertUser,
                                           migrateSqliteDB, runAction)
-import           Schema                  (User (..), migrateAll)
+
+import           Schema
+import           Types
 
 
+-- TODO: fixme
 setupTests :: IO (SQLiteInfo, RedisInfo, ClientEnv, ThreadId)
 setupTests = do
   config     <- fetchConfig Test

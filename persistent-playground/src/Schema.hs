@@ -22,6 +22,7 @@ import           Database.Persist     (Entity (..), Key (..))
 import           Database.Persist.Sql (fromSqlKey, toSqlKey)
 import qualified Database.Persist.TH  as PTH
 
+
 PTH.share [PTH.mkPersist PTH.sqlSettings, PTH.mkMigrate "migrateAll"]
   [PTH.persistLowerCase|
     User sql=users
