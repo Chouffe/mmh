@@ -50,6 +50,13 @@ instance (MonadIO m, MonadLogger m) => MonadDatabase (SqlPersistT m) where
   deleteUserDB :: Int64 -> SqlPersistT m ()
   deleteUserDB uid = delete ((toSqlKey uid) :: Key User)
 
+  allUsersDB :: SqlPersistT m [KeyVal User]
+  allUsersDB = do
+    entities <- select . from $ \users -> do
+      limit 100
+      return users
+    return $ unEntity <$> entities
+
   fetchArticleDB :: Int64 -> SqlPersistT m (Maybe Article)
   fetchArticleDB aid = get (toSqlKey aid)
 

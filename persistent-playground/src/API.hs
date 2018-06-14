@@ -6,18 +6,18 @@
 
 module API where
 
-import           Control.Monad.IO.Class     (liftIO)
-import           Control.Monad.Trans.Except (throwE)
-import           Data.Int                   (Int64)
-import           Data.Proxy                 (Proxy (..))
-import           Database.Persist           (Entity (..))
-import           Network.Wai.Handler.Warp   (run)
+import           Data.Int                 (Int64)
+import           Data.Proxy               (Proxy (..))
+import           Network.Wai.Handler.Warp (run)
 import           Servant.API
-import           Servant.Client             (ClientM, client)
+import           Servant.Client           (ClientM, client)
 import           Servant.Server
 
 import           Cache
 import           Database
+import           Monad.App
+import           Monad.Cache
+import           Monad.Database
 import           Schema
 import           Types
 
@@ -35,36 +35,38 @@ data Config
 type UsersAPI
   = "users" :> Capture "userid" Int64 :> Get '[JSON] User
   :<|> "users" :> ReqBody '[JSON] User :> Post '[JSON] Int64
-  :<|> "users" :> "all" :> Get '[JSON] [User]
+  :<|> "users" :> "all" :> Get '[JSON] [KeyVal User]
 
 -- Articles API
 type ArticlesAPI
   = "articles" :> Capture "articleid" Int64 :> Get '[JSON] Article
   :<|> "articles" :> ReqBody '[JSON] Article :> Post '[JSON] Int64
-  :<|> "articles" :> "author" :> Capture "authorid" Int64 :> Get '[JSON] [Entity Article]
-  :<|> "articles" :> "recent" :> Get '[JSON] [(Entity User, Entity Article)]
+  :<|> "articles" :> "author" :> Capture "authorid" Int64 :> Get '[JSON] [KeyVal Article]
+  :<|> "articles" :> "recent" :> Get '[JSON] [(KeyVal User, KeyVal Article)]
 
 type FullAPI
   = UsersAPI
   :<|> ArticlesAPI
 
-usersServer :: SQLiteInfo -> RedisInfo -> Server UsersAPI
-usersServer sqlInfo redInfo =
-       fetchUserHandler sqlInfo redInfo
-  :<|> createUserHandler sqlInfo
-  :<|> allUsersHandler sqlInfo
+usersServer :: (AppMonad :~> Handler) -> Server UsersAPI
+usersServer naturalTransformation =
+  enter naturalTransformation
+    $ fetchUserHandler
+    :<|> createUserHandler
+    :<|> allUsersHandler
 
-articlesServer :: SQLiteInfo -> Server ArticlesAPI
-articlesServer sqlInfo =
-       fetchArticleHandler sqlInfo
-  :<|> createArticleHandler sqlInfo
-  :<|> fetchArticleByAuthorHandler sqlInfo
-  :<|> fetchRecentArticlesHandler sqlInfo
+articlesServer :: (AppMonad :~> Handler) -> Server ArticlesAPI
+articlesServer naturalTransformation =
+  enter naturalTransformation
+  $ fetchArticleHandler
+  :<|> createArticleHandler
+  :<|> fetchArticleByAuthorHandler
+  :<|> fetchRecentArticlesHandler
 
-fullServer :: SQLiteInfo -> RedisInfo -> Server FullAPI
-fullServer sqlInfo redInfo =
-       usersServer sqlInfo redInfo
-  :<|> articlesServer sqlInfo
+fullServer :: (AppMonad :~> Handler) -> Server FullAPI
+fullServer naturalTransformation =
+       usersServer naturalTransformation
+  :<|> articlesServer naturalTransformation
 
 usersAPI :: Proxy UsersAPI
 usersAPI = Proxy :: Proxy UsersAPI
@@ -93,70 +95,59 @@ runServer serverMode = do
   putStrLn $ "Running server on port: " ++ (show (port config))
   run (port config)
     $ serve fullAPI
-    $ fullServer (sqliteInfo config) (redisInfo config)
+    $ fullServer
+    $ transformAppToHandler (sqliteInfo config) (redisInfo config)
 
--- TODO: Handlers
-fetchUserHandler :: SQLiteInfo -> RedisInfo -> Int64 -> Handler User
-fetchUserHandler connStr redInfo userId = undefined
--- fetchUserHandler connStr redInfo userId = do
---   liftIO $ putStrLn "Fetching User"
---   mRedisUser <- liftIO $ fetchUserRedis redInfo userId
---   case mRedisUser of
---     Just user -> liftIO (putStrLn "Cache Hit!") >> return user
---     Nothing -> do
---       mDBuser <- liftIO $ fetchUserSQLite connStr userId
---       case mDBuser of
---         Nothing   -> Handler $ (throwE $ err401 { errBody = "Could not find user with ID"})
---         Just user -> do
---           liftIO $ cacheUserRedis redInfo userId user
---           return user
+fetchUserHandler :: (MonadDatabase m, MonadCache m) => Int64 -> m User
+fetchUserHandler uid = do
+  muser <- fetchCachedUser uid
+  case muser of
+    Just user -> return user
+    Nothing   -> do
+      muser' <- fetchUserDB uid
+      case muser' of
+        Just user -> return user
+        Nothing   -> error "Could not find user with ID"
 
-createUserHandler :: SQLiteInfo -> User -> Handler Int64
-createUserHandler connStr user = undefined
--- createUserHandler connStr user = do
---   liftIO $ putStrLn "Creating user"
---   liftIO $ createUserSQLite connStr user
+createUserHandler :: MonadDatabase m => User -> m Int64
+createUserHandler = createUserDB
 
-allUsersHandler :: SQLiteInfo -> Handler [User]
-allUsersHandler connStr = undefined
--- allUsersHandler connStr = liftIO $ getAllUsersSQLite connStr
+allUsersHandler :: MonadDatabase m => m [KeyVal User]
+allUsersHandler = allUsersDB
 
-fetchArticleHandler :: SQLiteInfo -> Int64 -> Handler Article
-fetchArticleHandler connStr aid = undefined
--- fetchArticleHandler connStr aid = do
---   maybeArticle <- liftIO $ fetchArticleSQLite connStr aid
---   case maybeArticle of
---     Just article -> return article
---     Nothing -> Handler $ (throwE $ err401 { errBody = "Could not find article with that ID" })
+fetchArticleHandler :: MonadDatabase m => Int64 -> m Article
+fetchArticleHandler aid = do
+  marticle <- fetchArticleDB aid
+  case marticle of
+    Just article -> return article
+    Nothing      -> error "Could not fetch article with ID"
 
-createArticleHandler :: SQLiteInfo -> Article -> Handler Int64
-createArticleHandler connStr article = undefined
--- createArticleHandler connStr article = liftIO $ createArticleSQLite connStr article
+createArticleHandler :: MonadDatabase m => Article -> m Int64
+createArticleHandler = createArticleDB
 
-fetchArticleByAuthorHandler :: SQLiteInfo -> Int64 -> Handler [Entity Article]
-fetchArticleByAuthorHandler connStr uid = undefined
--- fetchArticleByAuthorHandler connStr uid = liftIO $ fetchArticleByAuthorSQLite connStr uid
+fetchArticleByAuthorHandler :: MonadDatabase m => Int64 -> m [KeyVal Article]
+fetchArticleByAuthorHandler = fetchArticlesByAuthorDB
 
-fetchRecentArticlesHandler :: SQLiteInfo -> Handler [(Entity User, Entity Article)]
-fetchRecentArticlesHandler connStr = undefined
--- fetchRecentArticlesHandler connStr = liftIO $ fetchRecentArticlesSQLite connStr 10
+fetchRecentArticlesHandler :: MonadDatabase m => m [(KeyVal User, KeyVal Article)]
+fetchRecentArticlesHandler = fetchRecentArticlesDB
 
 -- Servant Client: used in Tests to query programmatically the API
 
 fetchUserClient :: Int64 -> ClientM User
 createUserClient :: User -> ClientM Int64
-allUsersClient :: ClientM [User]
+allUsersClient :: ClientM [KeyVal User]
 
-fetchUserClient :<|>
+( fetchUserClient  :<|>
   createUserClient :<|>
-  allUsersClient = client (Proxy :: Proxy UsersAPI)
+  allUsersClient ) = client (Proxy :: Proxy UsersAPI)
+
 
 fetchArticleClient :: Int64 -> ClientM Article
 createArticleClient :: Article -> ClientM Int64
-fetchArticleByAuthorClient :: Int64 -> ClientM [Entity Article]
-fetchRecentArticlesClient :: ClientM [(Entity User, Entity Article)]
+fetchArticleByAuthorClient :: Int64 -> ClientM [KeyVal Article]
+fetchRecentArticlesClient :: ClientM [(KeyVal User, KeyVal Article)]
 
-fetchArticleClient :<|>
-  createArticleClient :<|>
-  fetchArticleByAuthorClient :<|>
-  fetchRecentArticlesClient = client (Proxy :: Proxy ArticlesAPI)
+( fetchArticleClient          :<|>
+  createArticleClient         :<|>
+  fetchArticleByAuthorClient  :<|>
+  fetchRecentArticlesClient ) = client (Proxy :: Proxy ArticlesAPI)
