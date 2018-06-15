@@ -106,7 +106,9 @@ fetchUserHandler uid = do
     Nothing   -> do
       muser' <- fetchUserDB uid
       case muser' of
-        Just user -> return user
+        Just user -> do
+          cacheUser uid user
+          return user
         Nothing   -> error "Could not find user with ID"
 
 createUserHandler :: MonadDatabase m => User -> m Int64

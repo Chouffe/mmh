@@ -85,14 +85,14 @@ instance MonadDatabase AppMonad where
 
 transformAppToHandler :: SQLiteInfo -> RedisInfo -> (AppMonad :~> Handler)
 transformAppToHandler sqliteInfo redisInfo = NT $ \action ->  do
-  result <- liftIO $ handler `handle` (runAppAction action)
+  result <- liftIO $ handler `handle` (runAppAction sqliteInfo redisInfo action)
   Handler $ either throwError return result
 
   where
     handler :: SomeException -> IO (Either ServantErr a)
     handler e = return $ Left $ err500 { errBody = pack (show e) }
 
-    runAppAction :: Exception e => AppMonad a -> IO (Either e a)
-    runAppAction (AppMonad action) = do
-      result <- runSqliteAction sqliteInfo $ runReaderT action redisInfo
-      return $ Right result
+runAppAction :: Exception e => SQLiteInfo -> RedisInfo -> AppMonad a -> IO (Either e a)
+runAppAction sqliteInfo redisInfo (AppMonad action) = do
+  result <- runSqliteAction sqliteInfo $ runReaderT action redisInfo
+  return $ Right result

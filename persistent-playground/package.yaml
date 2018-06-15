@@ -42,6 +42,15 @@ dependencies:
 
 library:
   source-dirs: src
+  exposed-modules:
+  - API
+  - Cache
+  - Database
+  - Monad.App
+  - Monad.Cache
+  - Monad.Database
+  - Types
+  - Schema
 
 executables:
   persistent-playground-exe:

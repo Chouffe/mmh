@@ -15,7 +15,6 @@ import           Types
 
 type RedisInfo = ConnectInfo
 
-
 fetchRedisInfo :: ServerMode -> IO RedisInfo
 fetchRedisInfo Test = return defaultConnectInfo
 fetchRedisInfo Dev  = return defaultConnectInfo
