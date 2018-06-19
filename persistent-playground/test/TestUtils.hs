@@ -15,8 +15,8 @@ import           Network.HTTP.Client      (newManager)
 import           Network.HTTP.Client.TLS  (tlsManagerSettings)
 import           Servant.Client           (ClientEnv (..), parseBaseUrl)
 
-import           API                      (fetchConfig, port, redisInfo,
-                                           runServer, sqliteInfo, usersAPI)
+import           API                      (fetchConfig, fullAPI, port,
+                                           redisInfo, runServer, sqliteInfo)
 import           Database                 (SQLiteInfo)
 import           Network.Wai.Handler.Warp (run)
 import           Servant.API
@@ -60,13 +60,14 @@ setupInMemoryTests = do
   putStrLn $ "Starting test server on port: " ++ show (port config)
   tid <- forkIO
     $ run (port config)
-    $ serve usersAPI
-    $ testAPIServer
+    $ serve fullAPI
+    $ testAPIFullServer
     $ transformTestToHandler ref
 
   threadDelay 1000000
   return (clientEnv, ref, tid)
 
+-- Test API and Server
 
 testAPIServer :: (TestMonad :~> Handler) -> Server UsersAPI
 testAPIServer nt =
@@ -74,3 +75,21 @@ testAPIServer nt =
     $ fetchUserHandler
     :<|> createUserHandler
     :<|> allUsersHandler
+
+testUsersAPIServer :: (TestMonad :~> Handler) -> Server UsersAPI
+testUsersAPIServer nt =
+  enter nt
+  $ fetchUserHandler
+  :<|> createUserHandler
+  :<|> allUsersHandler
+
+testArticlesAPIServer :: (TestMonad :~> Handler) -> Server ArticlesAPI
+testArticlesAPIServer nt =
+  enter nt
+  $ fetchArticleHandler
+  :<|> createArticleHandler
+  :<|> fetchArticleByAuthorHandler
+  :<|> fetchRecentArticlesHandler
+
+testAPIFullServer :: (TestMonad :~> Handler) -> Server FullAPI
+testAPIFullServer nt = testUsersAPIServer nt :<|> testArticlesAPIServer nt

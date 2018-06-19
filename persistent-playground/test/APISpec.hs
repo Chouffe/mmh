@@ -96,10 +96,9 @@ runInMemoryTests clientEnv ref = do
     $ before (beforeHook3' clientEnv ref)
     $ spec3
 
-  -- TODO: implement test server for Articles
-  -- hspec
-  --   $ before (beforeHook4' clientEnv ref)
-  --   $ spec4
+  hspec
+    $ before (beforeHook4' clientEnv ref)
+    $ spec4
 
 
 runAppIgnoreError :: String -> SQLiteInfo -> RedisInfo -> AppMonad a -> IO a
