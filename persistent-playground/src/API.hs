@@ -68,6 +68,7 @@ fullServer naturalTransformation =
        usersServer naturalTransformation
   :<|> articlesServer naturalTransformation
 
+
 usersAPI :: Proxy UsersAPI
 usersAPI = Proxy :: Proxy UsersAPI
 

@@ -3,17 +3,18 @@
 
 module Main where
 
-import           Control.Concurrent     (killThread)
-import           Control.Exception      (SomeException)
-import           Control.Monad          (forM_, void)
-import           Control.Monad.IO.Class (liftIO)
-import           Data.Either            (isLeft, isRight)
-import           Data.Int               (Int64)
-import           Data.Maybe             (isJust)
-import           Data.Time.Clock.POSIX  (posixSecondsToUTCTime)
-import           Database.Persist.Sql   (Entity (..), entityVal, fromSqlKey,
-                                         toSqlKey)
-import           Servant.Client         (ClientEnv, runClientM)
+import           Control.Concurrent      (killThread)
+import           Control.Concurrent.MVar (MVar, readMVar)
+import           Control.Exception       (SomeException)
+import           Control.Monad           (forM_, void)
+import           Control.Monad.IO.Class  (liftIO)
+import           Data.Either             (isLeft, isRight)
+import           Data.Int                (Int64)
+import           Data.Maybe              (isJust)
+import           Data.Time.Clock.POSIX   (posixSecondsToUTCTime)
+import           Database.Persist.Sql    (Entity (..), entityVal, fromSqlKey,
+                                          toSqlKey)
+import           Servant.Client          (ClientEnv, runClientM)
 import           Test.Hspec
 
 
@@ -26,15 +27,32 @@ import           Monad.Database
 import           Schema
 import           Stub.Article
 import           Stub.User
-import           TestUtils              (setupTests)
+import           TestMonad
+import           TestUtils               (TestAppState, setupInMemoryTests,
+                                          setupTests)
 import           Types
 
 
 main :: IO ()
 main = do
   -- Setting up test server and config
-  (sqliteInfo, redisInfo, clientEnv, tid) <- setupTests
+  -- (sqliteInfo, redisInfo, clientEnv, tid) <- setupTests
+  (clientEnv, ref, tid) <- setupInMemoryTests
 
+  -- Running integration tests
+  -- runIntegrationTests sqliteInfo redisInfo clientEnv
+
+  -- Running in memory tests
+  runInMemoryTests clientEnv ref
+
+  -- Killing test server
+  killThread tid
+
+  return ()
+
+
+runIntegrationTests :: SQLiteInfo -> RedisInfo -> ClientEnv -> IO ()
+runIntegrationTests sqliteInfo redisInfo clientEnv = do
   hspec
     $ before (beforeHook1 clientEnv sqliteInfo redisInfo)
     $ spec1
@@ -64,10 +82,25 @@ main = do
     $ after (afterHook6 sqliteInfo redisInfo)
     $ spec6
 
-  -- Killing test server
-  killThread tid
+runInMemoryTests :: ClientEnv -> MVar TestAppState -> IO ()
+runInMemoryTests clientEnv ref = do
+  hspec
+    $ before (beforeHook1' clientEnv ref)
+    $ spec1
 
-  return ()
+  hspec
+    $ before (beforeHook2' clientEnv ref)
+    $ spec2
+
+  hspec
+    $ before (beforeHook3' clientEnv ref)
+    $ spec3
+
+  -- TODO: implement test server for Articles
+  -- hspec
+  --   $ before (beforeHook4' clientEnv ref)
+  --   $ spec4
+
 
 runAppIgnoreError :: String -> SQLiteInfo -> RedisInfo -> AppMonad a -> IO a
 runAppIgnoreError msg sqliteInfo redisInfo action = do
@@ -75,6 +108,21 @@ runAppIgnoreError msg sqliteInfo redisInfo action = do
   case result of
     Left _  -> error msg
     Right r -> return r
+
+beforeHook1' :: ClientEnv -> MVar TestAppState -> IO (Bool, Bool, Bool)
+beforeHook1' clientEnv ref = do
+  callResult <- runClientM (fetchUserClient userid) clientEnv
+  env <- liftIO $ readMVar ref
+  liftIO $ print env
+  runTestMonad ref $ do
+    inDB       <- isJust <$> fetchUserDB userid
+    inRedis    <- isJust <$> fetchCachedUser userid
+    let throwsError = isLeft callResult
+    return (throwsError, inDB, inRedis)
+
+  where
+    userid :: Int64
+    userid = 1
 
 beforeHook1 :: ClientEnv -> SQLiteInfo -> RedisInfo -> IO (Bool, Bool, Bool)
 beforeHook1 clientEnv sqliteInfo redisInfo = do
@@ -110,6 +158,26 @@ beforeHook2 clientEnv sqliteInfo redisInfo = do
     testUser :: User
     testUser = User "Test User" "test.user@test.test" 21 "SWE"
 
+beforeHook2' :: ClientEnv -> MVar TestAppState -> IO (Bool, Bool, Int64)
+beforeHook2' clientEnv ref = do
+  userKeyEither <- runClientM (createUserClient testUser) clientEnv
+  env <- liftIO $ readMVar ref
+  liftIO $ (print env)
+
+  runTestMonad ref $ do
+    -- env <- liftIO $ readMVar ref
+    -- liftIO $ (print env)
+    case userKeyEither of
+      Left _        -> error "DB call failed on spec2"
+      Right userKey -> do
+        inDB    <- isJust <$> fetchUserDB userKey
+        inRedis <- isJust <$> fetchCachedUser userKey
+        return (inDB, inRedis, userKey)
+
+  where
+    testUser :: User
+    testUser = User "Test User" "test.user@test.test" 21 "SWE"
+
 afterHook :: SQLiteInfo -> RedisInfo -> (Bool, Bool, Int64) -> IO ()
 afterHook sqliteInfo redisInfo (_, _, uid) = deleteArtifacts sqliteInfo redisInfo [uid] []
 
@@ -126,6 +194,18 @@ beforeHook3 clientEnv sqliteInfo redisInfo = do
     Right userKey -> do
       runClientM (fetchUserClient userKey) clientEnv
       runAppIgnoreError "beforeHook3 failed" sqliteInfo redisInfo $ do
+        inDB    <- isJust <$> fetchUserDB userKey
+        inRedis <- isJust <$> fetchCachedUser userKey
+        return (inDB, inRedis, userKey)
+
+beforeHook3' :: ClientEnv -> MVar TestAppState -> IO (Bool, Bool, Int64)
+beforeHook3' clientEnv ref = do
+  userKeyEither <- runClientM (createUserClient testUser1) clientEnv
+  case userKeyEither of
+    Left _ -> error "DB called failed on spec3"
+    Right userKey -> do
+      runClientM (fetchUserClient userKey) clientEnv
+      runTestMonad ref $ do
         inDB    <- isJust <$> fetchUserDB userKey
         inRedis <- isJust <$> fetchCachedUser userKey
         return (inDB, inRedis, userKey)
@@ -153,6 +233,18 @@ beforeHook4 clientEnv sqliteInfo redisInfo = do
       fetchResult <- runClientM (fetchArticleClient articleKey) clientEnv
       let callSucceeds = isRight fetchResult
       articleInDB <- isJust <$> runSqliteAction sqliteInfo (fetchArticleDB articleKey)
+      return (callSucceeds, articleInDB, userKey, articleKey)
+
+beforeHook4' :: ClientEnv -> MVar TestAppState -> IO (Bool, Bool, Int64, Int64)
+beforeHook4' clientEnv ref = do
+  userKey          <- runTestMonad ref (createUserDB testUser2)
+  articleKeyEither <- runClientM (createArticleClient (testArticle1 userKey)) clientEnv
+  case articleKeyEither of
+    Left e -> error "DB call failed on spec 4!"
+    Right articleKey -> do
+      fetchResult <- runClientM (fetchArticleClient articleKey) clientEnv
+      let callSucceeds = isRight fetchResult
+      articleInDB <- isJust <$> runTestMonad ref (fetchArticleDB articleKey)
       return (callSucceeds, articleInDB, userKey, articleKey)
 
 spec4 :: SpecWith (Bool, Bool, Int64, Int64)
