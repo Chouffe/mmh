@@ -18,6 +18,7 @@ import qualified Data.List                  as List
 import qualified Data.Map                   as Map
 import           Database.Persist.Sql       (fromSqlKey)
 import           Servant                    (throwError)
+import           Servant.Server             (ServantErr (..), err500)
 import           Servant.Server
 
 import           Monad.Cache

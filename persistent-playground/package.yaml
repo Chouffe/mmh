@@ -25,10 +25,12 @@ dependencies:
 - bytestring
 - containers
 - esqueleto
+- freer-simple
 - hedis
 - lens
 - monad-logger
 - mtl
+- natural-transformation
 - persistent
 - persistent-postgresql
 - persistent-sqlite
@@ -46,8 +48,14 @@ library:
   source-dirs: src
   exposed-modules:
   - API
+  - APIEff
+  - APIMonad
   - Cache
   - Database
+  - Eff.Cache
+  - Eff.Database
+  - Eff.Utils
+  - Errors
   - Monad.App
   - Monad.Cache
   - Monad.Database

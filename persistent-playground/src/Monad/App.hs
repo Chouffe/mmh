@@ -84,7 +84,7 @@ instance MonadDatabase AppMonad where
 -- newtype Handler a = Handler { runHandler' :: ExceptT ServantErr IO a }
 
 transformAppToHandler :: SQLiteInfo -> RedisInfo -> (AppMonad :~> Handler)
-transformAppToHandler sqliteInfo redisInfo = NT $ \action ->  do
+transformAppToHandler sqliteInfo redisInfo = NT $ \action -> do
   result <- liftIO $ handler `handle` (runAppAction sqliteInfo redisInfo action)
   Handler $ either throwError return result
 

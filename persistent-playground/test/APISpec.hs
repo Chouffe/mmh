@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -7,6 +8,7 @@ import           Control.Concurrent      (killThread)
 import           Control.Concurrent.MVar (MVar, readMVar)
 import           Control.Exception       (SomeException)
 import           Control.Monad           (forM_, void)
+import           Control.Monad.Freer     (Eff, Member)
 import           Control.Monad.IO.Class  (liftIO)
 import           Data.Either             (isLeft, isRight)
 import           Data.Int                (Int64)
@@ -21,12 +23,15 @@ import           Test.Hspec
 import           API
 import           Cache
 import           Database
+import qualified Eff.Cache               as EffCache
+import qualified Eff.Database            as EffDatabase
 import           Monad.App
 import           Monad.Cache
 import           Monad.Database
 import           Schema
 import           Stub.Article
 import           Stub.User
+import           TestEff                 (runTestAppEff')
 import           TestMonad
 import           TestUtils               (TestAppState, setupInMemoryTests,
                                           setupTests)
@@ -42,8 +47,11 @@ main = do
   -- Running integration tests
   -- runIntegrationTests sqliteInfo redisInfo clientEnv
 
-  -- Running in memory tests
+  -- Running in memory tests with Monad
   runInMemoryTests clientEnv ref
+
+  -- Running in memory tests with Eff
+  -- runInMemoryTests' clientEnv ref
 
   -- Killing test server
   killThread tid
@@ -100,6 +108,12 @@ runInMemoryTests clientEnv ref = do
     $ before (beforeHook4' clientEnv ref)
     $ spec4
 
+-- In Memory Tests for Eff
+runInMemoryTests' :: ClientEnv -> MVar TestAppState -> IO ()
+runInMemoryTests' clientEnv ref = do
+  hspec
+    $ before (beforeHook1'' clientEnv ref)
+    $ spec1
 
 runAppIgnoreError :: String -> SQLiteInfo -> RedisInfo -> AppMonad a -> IO a
 runAppIgnoreError msg sqliteInfo redisInfo action = do
@@ -107,6 +121,21 @@ runAppIgnoreError msg sqliteInfo redisInfo action = do
   case result of
     Left _  -> error msg
     Right r -> return r
+
+beforeHook1'' :: ClientEnv -> MVar TestAppState -> IO (Bool, Bool, Bool)
+beforeHook1'' clientEnv ref = do
+  callResult <- runClientM (fetchUserClient userid) clientEnv
+  env <- liftIO $ readMVar ref
+  liftIO $ print env
+  runTestAppEff' ref $ do
+    inDB       <- isJust <$> EffDatabase.fetchUserDB userid
+    inRedis    <- isJust <$> EffCache.fetchCachedUser userid
+    let throwsError = isLeft callResult
+    return (throwsError, inDB, inRedis)
+
+  where
+    userid :: Int64
+    userid = 1
 
 beforeHook1' :: ClientEnv -> MVar TestAppState -> IO (Bool, Bool, Bool)
 beforeHook1' clientEnv ref = do

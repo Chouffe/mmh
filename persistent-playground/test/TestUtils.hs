@@ -23,9 +23,13 @@ import           Servant.API
 import           Servant.Server
 
 import           API
+import qualified APIEff
 import           Cache
 import           Schema
-import           TestMonad
+import           TestEff                  (TestAppEff (..))
+import qualified TestEff                  as TE
+import           TestMonad                (ArticleMap, TestMonad, UserMap)
+import qualified TestMonad                as TM
 import           Types
 
 
@@ -62,13 +66,35 @@ setupInMemoryTests = do
     $ run (port config)
     $ serve fullAPI
     $ testAPIFullServer
-    $ transformTestToHandler ref
+    $ TM.transformTestToHandler ref
+
+  threadDelay 1000000
+  return (clientEnv, ref, tid)
+
+-- In memory tests with Eff instead of AppMonad
+setupInMemoryTests' :: IO (ClientEnv, MVar TestAppState, ThreadId)
+setupInMemoryTests' = do
+  config     <- fetchConfig Test
+  mgr        <- newManager tlsManagerSettings
+  baseUrl    <- parseBaseUrl $ "http://127.0.0.1:" ++ show (port config)
+
+  let clientEnv = ClientEnv mgr baseUrl
+  let initialMap = (Map.empty, Map.empty, Map.empty) :: TestAppState
+
+  ref <- newMVar initialMap
+  putStrLn $ "Starting test server on port: " ++ show (port config)
+  tid <- forkIO
+    $ run (port config)
+    $ serve fullAPI
+    $ testAPIFullServer'
+    $ TE.transformTestEffToHandler ref
 
   threadDelay 1000000
   return (clientEnv, ref, tid)
 
 -- Test API and Server
 
+-- For TestMonad
 testAPIServer :: (TestMonad :~> Handler) -> Server UsersAPI
 testAPIServer nt =
   enter nt
@@ -93,3 +119,29 @@ testArticlesAPIServer nt =
 
 testAPIFullServer :: (TestMonad :~> Handler) -> Server FullAPI
 testAPIFullServer nt = testUsersAPIServer nt :<|> testArticlesAPIServer nt
+
+-- For Eff Monad
+testAPIServer' :: (TestAppEff :~> Handler) -> Server UsersAPI
+testAPIServer' nt =
+  enter nt
+    $ APIEff.fetchUserHandler
+    :<|> APIEff.createUserHandler
+    :<|> APIEff.allUsersHandler
+
+testUsersAPIServer' :: (TestAppEff :~> Handler) -> Server UsersAPI
+testUsersAPIServer' nt =
+  enter nt
+  $ APIEff.fetchUserHandler
+  :<|> APIEff.createUserHandler
+  :<|> APIEff.allUsersHandler
+
+testArticlesAPIServer' :: (TestAppEff :~> Handler) -> Server ArticlesAPI
+testArticlesAPIServer' nt =
+  enter nt
+  $ APIEff.fetchArticleHandler
+  :<|> APIEff.createArticleHandler
+  :<|> APIEff.fetchArticleByAuthorHandler
+  :<|> APIEff.fetchRecentArticlesHandler
+
+testAPIFullServer' :: (TestAppEff :~> Handler) -> Server FullAPI
+testAPIFullServer' nt = testUsersAPIServer' nt :<|> testArticlesAPIServer' nt

@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs        #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
