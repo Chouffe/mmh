@@ -2,10 +2,12 @@
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE TypeOperators       #-}
 
-module API where
+module APIEff where
 
+import           Control.Monad.Freer      (Eff, Member)
 import           Data.Int                 (Int64)
 import           Data.Proxy               (Proxy (..))
 import           Network.Wai.Handler.Warp (run)
@@ -15,9 +17,9 @@ import           Servant.Server
 
 import           Cache
 import           Database
-import           Monad.App
-import           Monad.Cache
-import           Monad.Database
+import           Eff.App
+import           Eff.Cache
+import           Eff.Database
 import           Schema
 import           Types
 
@@ -48,14 +50,14 @@ type FullAPI
   = UsersAPI
   :<|> ArticlesAPI
 
-usersServer :: (AppMonad :~> Handler) -> Server UsersAPI
+usersServer :: (AppEff :~> Handler) -> Server UsersAPI
 usersServer naturalTransformation =
   enter naturalTransformation
     $ fetchUserHandler
     :<|> createUserHandler
     :<|> allUsersHandler
 
-articlesServer :: (AppMonad :~> Handler) -> Server ArticlesAPI
+articlesServer :: (AppEff :~> Handler) -> Server ArticlesAPI
 articlesServer naturalTransformation =
   enter naturalTransformation
   $ fetchArticleHandler
@@ -63,7 +65,7 @@ articlesServer naturalTransformation =
   :<|> fetchArticleByAuthorHandler
   :<|> fetchRecentArticlesHandler
 
-fullServer :: (AppMonad :~> Handler) -> Server FullAPI
+fullServer :: (AppEff :~> Handler) -> Server FullAPI
 fullServer naturalTransformation =
        usersServer naturalTransformation
   :<|> articlesServer naturalTransformation
@@ -97,9 +99,10 @@ runServer serverMode = do
   run (port config)
     $ serve fullAPI
     $ fullServer
-    $ transformAppToHandler (sqliteInfo config) (redisInfo config)
+    $ transformEffToHandler (sqliteInfo config) (redisInfo config)
 
-fetchUserHandler :: (MonadDatabase m, MonadCache m) => Int64 -> m User
+-- Handlers
+fetchUserHandler :: (Member Database r, Member Cache r) => Int64 -> Eff r User
 fetchUserHandler uid = do
   muser <- fetchCachedUser uid
   case muser of
@@ -112,26 +115,26 @@ fetchUserHandler uid = do
           return user
         Nothing   -> error "Could not find user with ID"
 
-createUserHandler :: MonadDatabase m => User -> m Int64
+createUserHandler :: (Member Database r) => User -> Eff r Int64
 createUserHandler = createUserDB
 
-allUsersHandler :: MonadDatabase m => m [KeyVal User]
+allUsersHandler :: (Member Database r) => Eff r [KeyVal User]
 allUsersHandler = allUsersDB
 
-fetchArticleHandler :: MonadDatabase m => Int64 -> m Article
+fetchArticleHandler :: (Member Database r) => Int64 -> Eff r Article
 fetchArticleHandler aid = do
   marticle <- fetchArticleDB aid
   case marticle of
     Just article -> return article
     Nothing      -> error "Could not fetch article with ID"
 
-createArticleHandler :: MonadDatabase m => Article -> m Int64
+createArticleHandler :: (Member Database r) => Article -> Eff r Int64
 createArticleHandler = createArticleDB
 
-fetchArticleByAuthorHandler :: MonadDatabase m => Int64 -> m [KeyVal Article]
+fetchArticleByAuthorHandler :: (Member Database r) => Int64 -> Eff r [KeyVal Article]
 fetchArticleByAuthorHandler = fetchArticlesByAuthorDB
 
-fetchRecentArticlesHandler :: MonadDatabase m => m [(KeyVal User, KeyVal Article)]
+fetchRecentArticlesHandler :: (Member Database r) => Eff r [(KeyVal User, KeyVal Article)]
 fetchRecentArticlesHandler = fetchRecentArticlesDB
 
 -- Servant Client: used in Tests to query programmatically the API

@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
 
-module API where
+module APIMonad where
 
 import           Data.Int                 (Int64)
 import           Data.Proxy               (Proxy (..))
