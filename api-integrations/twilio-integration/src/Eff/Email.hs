@@ -8,8 +8,9 @@
 
 module Eff.Email
   ( runEmail
-  , mkConfig
+  , fetchEmailConfig
   , Email (..)
+  , Config
   , sendSubscribeEmail
   )
   where
@@ -18,8 +19,10 @@ import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Freer    (Eff, Member, send)
 import           Data.ByteString.Char8  (pack)
 import           Data.Text              (Text)
-import           Eff.Utils              (runNat)
 import           Mail.Hailgun
+import           System.Environment     (getEnv)
+
+import           Eff.Utils              (runNat)
 
 data Config
   = Config
@@ -29,8 +32,13 @@ data Config
     }
     deriving (Eq, Show)
 
-mkConfig :: String -> String -> UnverifiedEmailAddress -> Config
-mkConfig d k r = Config d k r
+
+fetchEmailConfig :: IO Config
+fetchEmailConfig = do
+  dom         <- getEnv "MAILGUN_DOMAIN"
+  key         <- getEnv "MAILGUN_API_KEY"
+  rplyAddress <- pack <$> getEnv "MAILGUN_REPLY_ADDRESS"
+  return $ Config dom key rplyAddress
 
 data Email a where
   SendSubscribeEmail :: Text -> Email (Either String ())

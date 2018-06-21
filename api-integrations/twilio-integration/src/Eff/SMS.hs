@@ -10,6 +10,7 @@ module Eff.SMS
   ( runSMS
   , messageToSMSCommand
   , SMS (..)
+  , SMSCommand (..)
   , sendText
   , twilioNum
   , twilioTestNum
@@ -46,9 +47,9 @@ myNumber :: Text
 myNumber = "+123456789"
 
 -- Can hold more commands as a Sum Type
-data SMSCommad = SubscribeCommand Text
+data SMSCommand = SubscribeCommand Text
 
-messageToSMSCommand :: Text -> Maybe SMSCommad
+messageToSMSCommand :: Text -> Maybe SMSCommand
 messageToSMSCommand messageBody =
   case splitOn " " messageBody of
     ["subscribe", email] -> Just $ SubscribeCommand email
