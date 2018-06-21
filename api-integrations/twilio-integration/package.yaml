@@ -23,6 +23,8 @@ dependencies:
 - base >= 4.7 && < 5
 - bytestring
 - containers
+- freer-simple
+- hailgun
 - http-api-data
 - lens
 - monad-logger
@@ -40,8 +42,11 @@ dependencies:
 library:
   source-dirs: src
   exposed-modules:
-    - Lib
     - TwilioServer
+    - Server
+    - Email
+    - Eff.Email
+    - Eff.SMS
 
 executables:
   twilio-integration-exe:
