@@ -20,7 +20,7 @@ PTH.share [PTH.mkPersist PTH.sqlSettings, PTH.mkMigrate "migrateAll"]
   [PTH.persistLowerCase|
     Subscriber sql=subscribers
       email Text
-      UniqueEmail email
+      UniqueSubscriberEmail email
       deriving Show Read Eq
   |]
 

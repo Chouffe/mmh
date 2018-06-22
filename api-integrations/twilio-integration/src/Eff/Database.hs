@@ -9,8 +9,9 @@
 module Eff.Database
   ( fetchConfig
   , migrateDB
+  , Config (..)
 
-  , Database
+  , Database (..)
   , registerUser
   , retrieveSubscribers
   , runDatabase
@@ -21,15 +22,15 @@ import           Control.Monad                (void)
 import           Control.Monad.Freer.Extended (Eff, Member, send, runNat)
 import           Control.Monad.Logger         (LoggingT, runStdoutLoggingT)
 import           Control.Monad.Reader         (runReaderT)
-import           Data.ByteString.Char8        (pack)
+-- import           Data.ByteString.Char8        (pack)
 import           Data.ByteString              (ByteString)
 import           Data.Text                    (Text)
 import           Database.Persist             (insert, selectList)
 import           Database.Persist.Sql         (SqlPersistT, entityVal)
 import           Database.Persist.Postgresql  (withPostgresqlConn, runMigration)
-import           System.Environment           (getEnv)
+-- import           System.Environment           (getEnv)
 
-import Schema
+import           Schema
 
 data Config
   = Config
@@ -38,7 +39,7 @@ data Config
   deriving (Eq, Show)
 
 data Database a where
-  RegisterUser :: Text -> Database ()
+  RegisterUser        :: Text -> Database ()
   RetrieveSubscribers :: Database [Text]
 
 registerUser :: (Member Database r) => Text -> Eff r ()
@@ -67,8 +68,11 @@ runDatabase config = runNat databaseToIO
 
 fetchConfig :: IO Config
 fetchConfig = do
-  pgConn <- pack <$> getEnv "DATABASE_URL"
-  return $ Config pgConn
+  -- pgConn <- pack <$> getEnv "DATABASE_URL"
+  return $ Config defaultPGConn
+  where
+    defaultPGConn :: ByteString
+    defaultPGConn = "host=127.0.0.1 port=5432 user=postgres dbname=postgres password=password"
 
 migrateDB :: Config -> IO ()
 migrateDB config = runPGAction config $ runMigration migrateAll

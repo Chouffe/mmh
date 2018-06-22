@@ -11,7 +11,7 @@ module Control.Monad.Freer.Extended
   )
   where
 
-import Control.Monad.Freer (Member, Eff, send)
+import Control.Monad.Freer          (Member, Eff, send)
 import Control.Monad.Freer.Internal (handleRelay)
 
 runNat

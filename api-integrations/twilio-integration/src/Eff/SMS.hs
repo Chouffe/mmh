@@ -7,16 +7,19 @@
 {-# LANGUAGE TypeOperators      #-}
 
 module Eff.SMS
-  ( runSMS
+  ( Config (..)
+  , fetchConfig
+
+  , runSMS
   , messageToSMSCommand
-  , SMS (..)
+
+  , SMS
   , SMSCommand (..)
+
   , sendText
   , twilioNum
   , twilioTestNum
   , myNumber
-  , fetchSid
-  , fetchToken
   )
   where
 
@@ -28,12 +31,18 @@ import qualified Twilio.Messages               as TM
 import           System.Environment            (getEnv)
 
 
--- Configs
-fetchSid :: IO String
-fetchSid = getEnv "TWILIO_ACCOUT_SID"
+-- Configs: should it be a handle?
+data Config
+  = Config
+    { fetchSid   :: IO String
+    , fetchToken :: IO String
+    }
 
-fetchToken :: IO String
-fetchToken = getEnv "TWILIO_AUTH_TOKEN"
+instance Show Config where
+  show _ = "{ fetchSid: IO String, fetchToken: IO String }"
+
+fetchConfig :: IO Config
+fetchConfig = return $ Config (getEnv "TWILIO_ACCOUT_SID") (getEnv "TWILIO_AUTH_TOKEN")
 
 twilioNum :: Text
 twilioNum = "+17027490113"
