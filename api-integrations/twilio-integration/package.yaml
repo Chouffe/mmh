@@ -20,15 +20,20 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/githubuser/twilio-integration#readme>
 
 dependencies:
+- aeson
 - base >= 4.7 && < 5
 - bytestring
 - containers
+- directory
 - freer-simple
 - hailgun
 - http-api-data
 - lens
 - monad-logger
 - mtl
+- persistent
+- persistent-postgresql
+- persistent-template
 - resourcet
 - servant
 - servant-client
@@ -47,6 +52,7 @@ library:
     - Email
     - Eff.Email
     - Eff.SMS
+    - Eff.Database
 
 executables:
   twilio-integration-exe:

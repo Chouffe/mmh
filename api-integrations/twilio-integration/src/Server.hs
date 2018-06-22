@@ -1,8 +1,8 @@
 {-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE InstanceSigs      #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators     #-}
-{-# LANGUAGE FlexibleContexts  #-}
 
 module Server
   (runServer)
@@ -10,8 +10,10 @@ module Server
 
 
 import           Control.Monad            (void)
-import           Control.Monad.Freer      (Eff, Member, LastMember, runM)
+import           Control.Monad.Freer      (Eff, runM)
 import           Control.Monad.IO.Class   (liftIO)
+import           Data.ByteString.Char8    (pack)
+-- import           Data.Either              (either)
 import qualified Data.HashMap.Strict      as HM
 import           Data.Proxy               (Proxy (..))
 import           Network.Wai.Handler.Warp (run)
@@ -21,19 +23,35 @@ import           Servant.API              ((:<|>), (:>), FormUrlEncoded, Get,
 import           Servant.Server           (Handler, hoistServer)
 import           System.Environment       (getEnv)
 
+import           Eff.Email                (Email (..), runEmail,
+                                           sendSubscribeEmail)
 import qualified Eff.Email
-import           Eff.Email                (sendSubscribeEmail, Email (..), runEmail)
+import           Eff.SMS                  (SMS (..), SMSCommand (..),
+                                           messageToSMSCommand, runSMS,
+                                           sendText)
 import qualified Eff.SMS
-import           Eff.SMS                  (sendText, SMS (..), SMSCommand (..), messageToSMSCommand, runSMS)
 import           Types                    (IncomingMessage (..))
 
-data Config = Config { port :: Int }
+data Config = Config
+  { cPort :: Int
+  }
   deriving Show
 
 fetchConfig :: IO Config
 fetchConfig = do
   port <- read <$> getEnv "PORT"
   return $ Config port
+
+type AppEff = Eff '[SMS, Email, IO]
+
+runAppEff :: Eff.Email.Config -> AppEff a -> IO a
+runAppEff emailConfig eff = runM
+  $ runEmail emailConfig
+  $ runSMS Eff.SMS.fetchSid Eff.SMS.fetchToken eff
+
+-- TODO: improve Error handling
+appEffToHandler :: Eff.Email.Config -> AppEff a -> Handler a
+appEffToHandler emailConfig eff = liftIO $ runAppEff emailConfig eff
 
 type ServerAPI =
   "api" :> "ping" :> Get '[JSON] String :<|>
@@ -57,26 +75,20 @@ smsHandler :: IncomingMessage -> AppEff ()
 smsHandler = subscribeViaSMS
 
 -- Somme commands in the Eff monad
-subscribeViaSMS :: (Member SMS r, Member Email r, LastMember IO r) => IncomingMessage -> Eff r ()
+subscribeViaSMS :: IncomingMessage -> AppEff ()
 subscribeViaSMS msg = do
   case messageToSMSCommand (body msg) of
     Nothing -> sendText (fromNumber msg) "Sorry we did not understand the request..."
-    Just (SubscribeCommand email) -> do
-      void $ sendSubscribeEmail email
+    Just (SubscribeCommand email) -> void $ sendSubscribeEmail (pack (show email))
 
-echoSMS :: (Member SMS r, LastMember IO r) => IncomingMessage -> Eff r ()
-echoSMS msg = void $ sendText (fromNumber msg) (body msg)
+-- echoSMS :: IncomingMessage -> AppEff ()
+-- echoSMS msg = void $ sendText (fromNumber msg) (body msg)
 
-type AppEff = Eff '[SMS, Email, IO]
+-- incomingMessage :: IncomingMessage
+-- incomingMessage = IncomingMessage "+12345" "Echo Echo Echo..."  -- User a test number here
 
-runAppEff :: Eff.Email.Config -> AppEff a -> IO a
-runAppEff emailConfig eff = runM
-  $ runEmail emailConfig
-  $ runSMS Eff.SMS.fetchSid Eff.SMS.fetchToken eff
-
--- TODO: improve Error handling
-appEffToHandler :: Eff.Email.Config -> AppEff a -> Handler a
-appEffToHandler emailConfig eff = liftIO $ runAppEff emailConfig eff
+-- sendSimpleEmail :: AppEff ()
+-- sendSimpleEmail = either (const ()) (const ()) <$> sendSubscribeEmail "verified@mail.com"
 
 runServer :: IO ()
 runServer = do
@@ -90,4 +102,4 @@ runServer = do
   putStrLn $ "Running Server with Config: " ++ show serverConfig
 
   -- Running Servant Server
-  run (port serverConfig) $ serve fullAPI (fullServer emailConfig)
+  run (cPort serverConfig) $ serve fullAPI (fullServer emailConfig)

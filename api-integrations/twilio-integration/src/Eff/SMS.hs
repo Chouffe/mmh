@@ -20,14 +20,13 @@ module Eff.SMS
   )
   where
 
-import           Data.Text                (Text, splitOn)
-import           Control.Monad.IO.Class   (liftIO)
-import           Control.Monad.Freer      (Eff, Member, send)
-import qualified Twilio.Messages          as TM
-import           System.Environment       (getEnv)
+import           Control.Monad.IO.Class        (liftIO)
+import           Control.Monad.Freer.Extended  (Eff, Member, send, runNat)
+import           Data.Text                     (Text, splitOn)
 import           Twilio
+import qualified Twilio.Messages               as TM
+import           System.Environment            (getEnv)
 
-import           Eff.Utils                (runNat)
 
 -- Configs
 fetchSid :: IO String

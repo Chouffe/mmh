@@ -5,9 +5,11 @@
 {-# LANGUAGE RankNTypes       #-}
 {-# LANGUAGE LambdaCase       #-}
 
-module Eff.Utils
-    (runNat)
-    where
+module Control.Monad.Freer.Extended
+  ( module Control.Monad.Freer
+  , runNat
+  )
+  where
 
 import Control.Monad.Freer (Member, Eff, send)
 import Control.Monad.Freer.Internal (handleRelay)
