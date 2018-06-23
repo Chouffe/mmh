@@ -28,6 +28,7 @@ dependencies:
 - freer-simple
 - hailgun
 - http-api-data
+- http-client-tls
 - lens
 - monad-logger
 - mtl
@@ -50,6 +51,7 @@ library:
     - TwilioServer
     - Server
     - Email
+    - Mailchimp
     - Eff.Email
     - Eff.SMS
     - Eff.Database
