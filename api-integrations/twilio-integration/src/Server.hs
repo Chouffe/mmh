@@ -16,7 +16,6 @@ import           Control.Monad            (void)
 import           Control.Monad.Freer      (Eff, runM)
 import           Control.Monad.IO.Class   (liftIO)
 import           Data.ByteString.Char8    (pack)
--- import           Data.Either              (either)
 import qualified Data.HashMap.Strict      as HM
 import           Data.Proxy               (Proxy (..))
 import           Data.Text                (Text)
@@ -37,35 +36,47 @@ import           Eff.SMS                  (SMS, SMSCommand (..),
                                            messageToSMSCommand, runSMS,
                                            sendText)
 import qualified Eff.SMS
-import           Types                    (IncomingMessage (..))
+import           Types
 
-data Config = Config
+data Config
+  = Config
   { cPort     :: Int
   , cDatabase :: Eff.Database.Config
   , cEmail    :: Eff.Email.Config
   , cSMS      :: Eff.SMS.Config
+  , cEnv      :: Environment
   } deriving Show
 
-fetchConfig :: IO Config
-fetchConfig = do
+data Handle
+  = Handle
+    { hConfig   :: Config
+    , hDatabase :: Eff.Database.Handle
+    }
+
+fetchConfig :: Environment -> IO Config
+fetchConfig env = do
+  -- Add environment (test, dev, prod) switch
   port           <- read <$> getEnv "PORT"
   emailConfig    <- Eff.Email.fetchConfig
   databaseConfig <- Eff.Database.fetchConfig
   smsConfig      <- Eff.SMS.fetchConfig
-  return $ Config port databaseConfig emailConfig smsConfig
+  return $ Config port databaseConfig emailConfig smsConfig env
 
 type AppEff = Eff '[Database, SMS, Email, IO]
 
-runAppEff :: Config -> AppEff a -> IO a
-runAppEff Config {..} eff = runM
+runAppEff :: Handle -> AppEff a -> IO a
+runAppEff Handle{..} eff = runM
   $ runEmail cEmail
   $ runSMS (Eff.SMS.fetchSid cSMS) (Eff.SMS.fetchToken cSMS)
-  $ runDatabase cDatabase
+  $ runDatabase hDatabase
   $ eff
 
+  where
+    config@Config{..} = hConfig
+
 -- TODO: improve Error handling
-appEffToHandler :: Config -> AppEff a -> Handler a
-appEffToHandler config eff = liftIO $ runAppEff config eff
+appEffToHandler :: Handle -> AppEff a -> Handler a
+appEffToHandler handle eff = liftIO $ runAppEff handle eff
 
 type ServerAPI =
   "api" :> "ping" :> Get '[JSON] String :<|>
@@ -75,9 +86,9 @@ type ServerAPI =
 fullAPI :: Proxy ServerAPI
 fullAPI = Proxy :: Proxy ServerAPI
 
-fullServer :: Config -> Server ServerAPI
-fullServer config =
-  hoistServer fullAPI (appEffToHandler config)
+fullServer :: Handle -> Server ServerAPI
+fullServer handle =
+  hoistServer fullAPI (appEffToHandler handle)
   ( pingHandler      :<|>
     smsHandler       :<|>
     subscribeHandler
@@ -121,19 +132,23 @@ subscribeViaSMS msg = do
 -- sendSimpleEmail :: AppEff ()
 -- sendSimpleEmail = either (const ()) (const ()) <$> sendSubscribeEmail "verified@mail.com"
 
-runServer :: IO ()
-runServer = do
+runServer :: Environment -> IO ()
+runServer env = do
 
   -- Fetching configuration
-  config <- fetchConfig
-
-  -- DB Migration
-  migrateDB (cDatabase config)
+  config@Config{..} <- fetchConfig env
 
   -- Debugging
   putStrLn $ "config: " ++ show config
 
-  -- Running Servant Server
-  run (cPort config)
-    $ serve fullAPI
-    $ fullServer config
+  -- DB Migration
+  Eff.Database.withHandle cEnv cDatabase $ \hDatabase -> do
+
+    -- Creating the global handle
+    let handle = Handle config hDatabase
+
+    -- Migrating schemas
+    migrateDB hDatabase
+
+    -- Running Servant Server
+    run cPort $ serve fullAPI $ fullServer handle

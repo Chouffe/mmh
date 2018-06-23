@@ -36,6 +36,7 @@ dependencies:
 - persistent-postgresql
 - persistent-template
 - resourcet
+- resource-pool
 - servant
 - servant-client
 - servant-server
@@ -43,6 +44,7 @@ dependencies:
 - transformers
 - twilio
 - unordered-containers
+- wai
 - warp
 
 library:

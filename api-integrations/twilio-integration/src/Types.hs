@@ -2,7 +2,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Types
-  (IncomingMessage (..))
+  ( IncomingMessage (..)
+  , Environment (..)
+  )
   where
 
 import qualified Data.HashMap.Strict as HM
@@ -36,3 +38,9 @@ instance FromForm IncomingMessage where
         fromNum <- HM.lookup "From" form
         bdy     <- HM.lookup "Body" form
         return (fromNum, bdy)
+
+data Environment
+  = Development
+  | Test
+  | Production
+  deriving (Eq, Show, Read)
