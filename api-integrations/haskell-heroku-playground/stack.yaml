@@ -64,5 +64,6 @@ packages:
 #
 # Allow a newer minor version of GHC than the snapshot specifies
 # compiler-check: newer-minor
+# not sure how to setup docker here for the app
 # docker:
 #   enable: true
