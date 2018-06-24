@@ -37,7 +37,7 @@ library:
   source-dirs: src
 
 executables:
-  haskell-heroku-playground-exe:
+  run-server-exe:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
