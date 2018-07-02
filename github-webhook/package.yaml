@@ -1,0 +1,70 @@
+name:                github-webhook
+version:             0.1.0.0
+github:              "githubuser/github-webhook"
+license:             BSD3
+author:              "Author name here"
+maintainer:          "example@example.com"
+copyright:           "2018 Author name here"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/githubuser/github-webhook#readme>
+
+dependencies:
+- aeson
+- base >= 4.7 && < 5
+- bytestring
+- containers
+- fast-logger
+- freer-simple
+- http-client
+- http-client-tls
+- lens
+- mtl
+- network
+- servant
+- servant-client
+- servant-server
+- text
+- time
+- transformers
+- warp
+
+library:
+  source-dirs: src
+  ghc-options:
+    - -Wall
+
+executables:
+  github-webhook-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - github-webhook
+
+tests:
+  github-webhook-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -Wall
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - bytestring
+    - github-webhook
+    - hspec

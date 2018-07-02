@@ -1,0 +1,4 @@
+.stack-work/
+github-webhook.cabal
+*~
+scripts/
