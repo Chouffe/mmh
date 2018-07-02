@@ -17,7 +17,7 @@ main = do
 
 beforeHook1 :: IO (Maybe GithubRequest)
 beforeHook1 = do
-  payload <- BS.readFile "test/payload/pull_request.json"
+  payload <- BS.readFile payloadFilename
   return $ decode payload
 
   where

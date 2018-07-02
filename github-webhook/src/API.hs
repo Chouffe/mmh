@@ -6,7 +6,9 @@
 {-# LANGUAGE TypeOperators       #-}
 
 module API
-  (runServer)
+  ( runServer
+  , GithubRequest (..)
+  )
   where
 
 import           Control.Monad.IO.Class   (liftIO)
